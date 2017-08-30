@@ -76,6 +76,27 @@ Here are some of the properties of the framework:
   and potentially decisions around what needs to be materialized can be
   done manually, algorithmically, or a mix of both
 
+## Semantics & Concepts
+* **dataset** is a table or collection of blocks that have a forward compatible schema
+* **task** is a piece of logic that source from a collection of blocks and target a single block
+* **run** is a single schedule and is time bound, it represents the left bound of the time interval of related task runs
+* **task run** is a single run of a single task
+* **block commit** is a block that was existed at some point in time, it may be active, archived, or deleted and
+  has an effective duration (start and open ended timestamp)
+* **subdag** is any subset of the graph, defined by a graph-subset-expression
+* **column sets** is a set of columns that can be referenced as a group and evolve over time
+  adding a new column to a set may be all you have to
+* **metric expression** corresponds
+* **hoarding-mode** if all raw data (logs, db scrapes, externaly sourced data is
+  marked as such, the system can insure that all history on those table is
+  hoarded forever and thus all derived datasets in history can be recomputed
+  at will (but at a cost!)
+* **reconciliation:** a reconciliation defines a batch of computation that
+  move the state of a set of blocks forward. It targets a subdag, and is
+  defined by a git SHA (to avoid a moving target) for a certain schedule
+  ranges. It's essentially a well scoped backfill
+
+
 # Guarantees & potential
 All of this metadata will make for a limitless UI.
 
@@ -84,7 +105,7 @@ All of this metadata will make for a limitless UI.
 * Everything is fully reproduceable
 * It's just one big DAG, no logical boundaries
 * effortless to add columns
-* intricate rules around garbage collection 
+* intricate rules around garbage collection
 
 # Parser / transform /  DSL
 * Use [a subset] of SQLAlchemy's SQL expression language?
@@ -94,22 +115,6 @@ All of this metadata will make for a limitless UI.
 * Add support for hints for things like
   * "DIMENSION JOIN", which implies one-to-many relationship
 * special handling around schedule-related special (partitioned) date field
-
-## Semantics & Concepts
-* **dataset** is a table or collection of blocks that have a forward compatible schema
-* **task** is a piece of logic that source from a collection of blocks and target a single block
-* **run** is a single schedule and is time bound, it represents the left bound of the time interval of related task runs
-* **task run** is a single run of a single task
-* **block commit** is a block that was existed at some point in time, it may be active, archived, or deleted and
-  has an effective duration (start and open ended timestamp)
-* **subdag** is any subset of the graph
-* **column sets** is a set of columns that can be referenced as a group and evolve over time
-  adding a new column to a set may be all you have to
-* **metric expression** corresponds
-* **hoarding-mode** if all raw data (logs, db scrapes, externaly sourced data is
-  marked as such, the system can insure that all history on those table is
-  hoarded forever and thus all derived datasets in history can be recomputed
-  at will (but at a cost!)
 
 ## Decisions to be made
 * schedule centric?! enforce time-constrained schedules as opposed to batch
@@ -141,6 +146,13 @@ Conceptually **EToiLe** is a "data compiler" where:
 # Reltionship with Airflow?
 Perhaps Airflow would know how to schedule and run EToiLe specs. EToiLe
 should still be self-standing and not require Airflow.
+
+# Litmus tests
+If the framework is well built, these things should be very easy
+* Adding a column and making it flow a root to leaf should be very easy, and require no DDL at all
+* For any given table or block, know if it's in sync with the repo, and if not, see a list of changes that need to be computed
+* It should be easy to apply slightly different logic for a date range, and have that date range only recomputed
+* It should be easy to scope any backfill on a subset of the DAG, scope and follow the progress of that backfill
 
 # DB models
 
