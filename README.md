@@ -10,7 +10,9 @@ Here are some of the properties of the framework:
   graphs of data structures and data transformations
 * **compute translator** translations of the DSL into real execution plan
   on multiple platforms (Hive, Spark, Presto, ...) are in scope for the
-  project
+  project. Escape hatches are also provided for when going to a lower level
+  is needed, but lineage metadata should still provided to the
+  framework in those cases.
 * **metadata centric**:
   * **hollistic data lineage:** EToiLe is fully aware of column **and** block-level
     lineage information
@@ -20,14 +22,15 @@ Here are some of the properties of the framework:
     of everything that ever took place
   * **operational metadata:** captures compute and storage information, helping
     to inform capacity planning and predict backfill costs
-  * **ownership aware** able to inform downstream crowds of upstream changes
+  * **multi-tenant / ownership-aware** able to inform downstream crowds of
+    upstream changes
 * **metadata driven:**
   * **scheduling:** EToiLe works like a compiler. Given changes on logic
     or the mutation of data blocks, it knows exactly what needs to be [re]processed
   * **compute accumulation:** EToiLe knows and can report on which blocks
     are "dirty" (need to be recomputed) based on upstream changes. "Dirt" can
     be enumerated for each block, table, or subDAG, and can be accumulated over time
-    until paying the [estimatable] cost of backfilling is triggered
+    until paying the [estimatable] cost of reconciliation is triggered
   * **schema aware:** knowing your expectations around schemas, EToiLe can
     move your schema forward through dynamic DDL to do things like add new
     columns to your tables. When columns are removed on the logical layer,
@@ -48,12 +51,12 @@ Here are some of the properties of the framework:
   may specify a dependency on 24 individual hourly blocks as well as it's
   own previous execution's block
 * **historical:** In theory, the full target state of the entire data warehouse is
-  declared. Provided the raw source blocks, the state of the warehouse at any point can
+  declared. Provided the raw (external) source blocks, the state of the warehouse at any point can
   be fully recomputed. Note that it is also possible to declare different logic to
   be applied to different, **non-overlapping** time periods on the same dataset.
   Historical jobs not only exist in source control, but are serialized into
   the database for quick retrieval where
-  needed (show history in the UI). Optionally all raw source data can
+  needed (UI / auto-generated audits document). Optionally all raw source data can
   be marked as such and kept indefinitely, to insure that along with logic
   history being systematically kept, all states in history are
   "auditable" and reproducible
@@ -95,6 +98,28 @@ Here are some of the properties of the framework:
   move the state of a set of blocks forward. It targets a subdag, and is
   defined by a git SHA (to avoid a moving target) for a certain schedule
   ranges. It's essentially a well scoped backfill
+
+# Views as pointers in history
+Let's explore a crazy powerful idea. First image that all table are partitioned
+by both schedule and fingerprint (something unique to the block). Now
+assume that every time we reprocess something, we allow for keepin the
+previous block in the table, in effect duplicating the data for the schedule
+that got mutated. Now overtime, every time something is re-processed, we
+duplicate the data, keeping previous history. Now that table as a whole
+is somewhat useless because of a lot of duplicated data.
+
+Now knowing what we know about the block, we can start creating views
+dynamically that simply have a
+`WHERE fingerprint IN ({list of none overlapping fingerprints})` clause that
+represent a version of the truth at a point in time. Knowing the lifespan
+of every block, we can create a view that represents a version of the table
+as of any point in time, assuming the underlying blocks have been kept around.
+
+This view layer is also how columns would be "deleted" by simply omitting
+the column name from the view definition.
+
+Since Presto and Hive views are incompatible, in environment that use both
+we'd have to generate both.
 
 
 # Guarantees & potential
